@@ -1144,9 +1144,10 @@
     <string name="read_aloud_scanning">Scanning this chapter for text. Tap again in a moment</string>
     <string name="read_aloud_off">Read aloud off</string>
     <string name="pref_read_aloud_voice">Voice</string>
-    <string name="pref_read_aloud_info">Speaks the translated text of the box you tap, in English, while read aloud is on in the reader.</string>
+    <string name="pref_read_aloud_info">Speaks the box you tap while read aloud is on in the reader: translations in English, other text in the text language. Scanned text is outlined in blue. Pick a speech language to override that.</string>
     <string name="pref_read_aloud_engine">Speech engine</string>
     <string name="pref_read_aloud_default_engine">Default</string>
+    <string name="pref_read_aloud_language">Speech language</string>
     <string name="pref_read_aloud_speed">Speech speed</string>
     <string name="pref_read_aloud_percent">%1$d%%</string>
     <string name="pref_read_aloud_test">Test voice</string>

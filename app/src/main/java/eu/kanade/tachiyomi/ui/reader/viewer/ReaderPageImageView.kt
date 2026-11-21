@@ -45,6 +45,8 @@ import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
 import eu.kanade.tachiyomi.ui.reader.viewer.webtoon.WebtoonStripImageView
 import eu.kanade.tachiyomi.util.system.animatorDurationScale
 import eu.kanade.tachiyomi.util.view.isVisibleOnScreen
+import mihon.translation.ReadAloudBoxes
+import mihon.translation.ReadAloudDisplay
 import okio.BufferedSource
 
 /**
@@ -74,6 +76,12 @@ open class ReaderPageImageView @JvmOverloads constructor(
             field = value
             invalidate()
         }
+
+    private val scannedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = 0xFF2979FF.toInt()
+        strokeWidth = resources.displayMetrics.density * 2f
+    }
 
     private val readAloudPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -249,16 +257,32 @@ open class ReaderPageImageView @JvmOverloads constructor(
         return fraction.takeIf { it.x in 0f..1f && it.y in 0f..1f }
     }
 
-    override fun dispatchDraw(canvas: Canvas) {
-        super.dispatchDraw(canvas)
-        val box = readAloudBox ?: return
-        val view = pageView ?: return
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        post(readAloudRefresh)
+    }
+
+    override fun onDetachedFromWindow() {
+        removeCallbacks(readAloudRefresh)
+        super.onDetachedFromWindow()
+    }
+
+    /** Pages get scanned while they are on screen, so the outlines are checked for again every so often. */
+    private val readAloudRefresh = object : Runnable {
+        override fun run() {
+            if (ReadAloudDisplay.active && readAloudPage != null) invalidate()
+            postDelayed(this, READ_ALOUD_REFRESH_MS)
+        }
+    }
+
+    private fun boxToViewRect(box: RectF): RectF? {
+        val view = pageView ?: return null
         val rect = when (view) {
             is SubsamplingScaleImageView -> {
-                if (!view.isReady) return
+                if (!view.isReady) return null
                 val topLeft = view.sourceToViewCoord(PointF(box.left * view.sWidth, box.top * view.sHeight))
                 val bottomRight = view.sourceToViewCoord(PointF(box.right * view.sWidth, box.bottom * view.sHeight))
-                if (topLeft == null || bottomRight == null) return
+                if (topLeft == null || bottomRight == null) return null
                 RectF(topLeft.x, topLeft.y, bottomRight.x, bottomRight.y)
             }
             is WebtoonStripImageView -> RectF(
@@ -267,10 +291,24 @@ open class ReaderPageImageView @JvmOverloads constructor(
                 box.right * view.width,
                 box.bottom * view.height,
             )
-            else -> return
+            else -> return null
         }
         rect.offset(view.left.toFloat(), view.top.toFloat())
-        canvas.drawRect(rect, readAloudPaint)
+        return rect
+    }
+
+    override fun dispatchDraw(canvas: Canvas) {
+        super.dispatchDraw(canvas)
+        val page = readAloudPage
+        if (page != null && ReadAloudDisplay.active) {
+            val rect = RectF()
+            ReadAloudBoxes.of(page).first.forEach {
+                rect.set(it.left, it.top, it.right, it.bottom)
+                boxToViewRect(rect)?.let { mapped -> canvas.drawRect(mapped, scannedPaint) }
+            }
+        }
+        val reading = readAloudBox?.let(::boxToViewRect) ?: return
+        canvas.drawRect(reading, readAloudPaint)
     }
 
     /**
@@ -542,3 +580,5 @@ open class ReaderPageImageView @JvmOverloads constructor(
 }
 
 private const val MAX_ZOOM_SCALE = 5F
+
+private const val READ_ALOUD_REFRESH_MS = 500L

@@ -42,11 +42,13 @@ class ReadAloud(
     fun toggle(): Boolean {
         val value = !mutableActive.value
         mutableActive.value = value
+        ReadAloudDisplay.active = value
         if (!value) release()
         return value
     }
 
-    fun speak(view: ReaderPageImageView, box: TextBox, locale: Locale) {
+    fun speak(view: ReaderPageImageView, box: TextBox, autoLocale: Locale) {
+        val locale = chosenLocale() ?: autoLocale
         clearFrame()
         framedView = view
         view.readAloudBox = RectF(box.left, box.top, box.right, box.bottom)
@@ -67,11 +69,14 @@ class ReadAloud(
     fun test(text: String) {
         clearFrame()
         withTts { engine ->
-            engine.setLanguage(Locale.ENGLISH)
+            engine.setLanguage(chosenLocale() ?: Locale.ENGLISH)
             engine.setSpeechRate(preferences.ttsSpeechRate.get() / 100f)
             engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "test")
         }
     }
+
+    private fun chosenLocale(): Locale? =
+        preferences.ttsLanguage.get().takeIf { it.isNotEmpty() }?.let(Locale::forLanguageTag)
 
     fun stop() {
         tts?.stop()

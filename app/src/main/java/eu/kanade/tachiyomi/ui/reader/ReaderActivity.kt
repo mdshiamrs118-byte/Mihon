@@ -121,7 +121,7 @@ import logcat.LogPriority
 import mihon.app.di.AppGraph
 import mihon.core.metro.metroGraph
 import mihon.translation.Langs
-import mihon.translation.TranslationDisplay
+import mihon.translation.ReadAloudBoxes
 import mihon.translation.TranslationStore
 import mihon.translation.WebAiHost
 import tachiyomi.core.common.Constants
@@ -730,16 +730,11 @@ class ReaderActivity : BaseActivity() {
         val view = findPageView(window.decorView, x.toInt(), y.toInt()) ?: return false
         val page = view.readAloudPage ?: return false
         val point = view.screenToImageFraction(x, y) ?: return false
-        val translated = if (TranslationDisplay.showTranslated) {
-            page.translation ?: TranslationStore.find(page)
+        val (boxes, isTranslation) = ReadAloudBoxes.of(page)
+        val locale = if (isTranslation) {
+            Locale.ENGLISH
         } else {
-            null
-        }
-        var boxes = translated?.boxes.orEmpty()
-        var locale = Locale.ENGLISH
-        if (boxes.isEmpty()) {
-            boxes = TranslationStore.readOcr(page)
-            locale = Locale.forLanguageTag(Langs.byCode(graph.translationPreferences.sourceLanguage.get()).code)
+            Locale.forLanguageTag(Langs.byCode(graph.translationPreferences.sourceLanguage.get()).code)
         }
         if (boxes.isEmpty()) {
             if (!TranslationStore.hasOcr(page)) {

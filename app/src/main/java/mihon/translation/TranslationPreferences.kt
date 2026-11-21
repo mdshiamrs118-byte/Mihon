@@ -37,6 +37,9 @@ class TranslationPreferences(
 
     val ttsEngine: Preference<String> = preferenceStore.getString("pref_read_aloud_engine", "")
 
+    /** A language tag, or empty to follow the text: English for translations, the text language otherwise. */
+    val ttsLanguage: Preference<String> = preferenceStore.getString("pref_read_aloud_language", "")
+
     val ttsSpeechRate: Preference<Int> = preferenceStore.getInt("pref_read_aloud_rate", 100)
 
     fun online() = OnlineConfig(apiBaseUrl.get(), apiKey.get(), apiModel.get())

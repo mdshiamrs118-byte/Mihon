@@ -119,6 +119,7 @@ class TranslationManager(
                         )
                     }
                     withContext(Dispatchers.IO) { TranslationStore.writeOcr(page, boxes) }
+                    page.scannedBoxes = boxes
                 } finally {
                     bitmap.recycle()
                 }
@@ -164,6 +165,7 @@ class TranslationManager(
         TranslationStore.delete(mangaId, chapterId)
         pages.forEach {
             it.translation = null
+            it.scannedBoxes = null
             it.notifyTranslationChanged()
         }
     }
@@ -224,6 +226,7 @@ class TranslationManager(
                             )
                         }
                         withContext(Dispatchers.IO) { TranslationStore.writeOcr(page, scanned) }
+                        page.scannedBoxes = scanned
                     }
 
                     val texts = bubbles.map { it.text }

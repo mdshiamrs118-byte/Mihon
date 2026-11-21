@@ -4,6 +4,7 @@ import eu.kanade.tachiyomi.source.model.Page
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import mihon.translation.TextBox
 import mihon.translation.TranslatedPage
 import mihon.translation.TranslationDisplay
 import java.io.InputStream
@@ -23,6 +24,10 @@ open class ReaderPage(
 
     @Volatile
     var translation: TranslatedPage? = null
+
+    /** Text boxes found by the read aloud scan, with the original text. */
+    @Volatile
+    var scannedBoxes: List<TextBox>? = null
 
     private val translationChanges = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 

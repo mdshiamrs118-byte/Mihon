@@ -26,6 +26,7 @@ data object SettingsReadAloudScreen : SearchableSettings {
         val engines = remember(defaultLabel) {
             readAloud.engines().mapValues { (key, label) -> if (key.isEmpty()) defaultLabel else label }
         }
+        val languages = remember(defaultLabel) { mapOf("" to defaultLabel) + READ_ALOUD_LANGUAGES }
         val sample = stringResource(MR.strings.pref_read_aloud_test_sentence)
 
         return listOf(
@@ -37,6 +38,11 @@ data object SettingsReadAloudScreen : SearchableSettings {
                         preference = prefs.ttsEngine,
                         entries = engines,
                         title = stringResource(MR.strings.pref_read_aloud_engine),
+                    ),
+                    Preference.PreferenceItem.ListPreference(
+                        preference = prefs.ttsLanguage,
+                        entries = languages,
+                        title = stringResource(MR.strings.pref_read_aloud_language),
                     ),
                     Preference.PreferenceItem.SliderPreference(
                         preference = prefs.ttsSpeechRate,
@@ -53,3 +59,23 @@ data object SettingsReadAloudScreen : SearchableSettings {
         )
     }
 }
+
+private val READ_ALOUD_LANGUAGES = mapOf(
+    "en" to "English",
+    "ko" to "Korean",
+    "ja" to "Japanese",
+    "zh" to "Chinese",
+    "es" to "Spanish",
+    "fr" to "French",
+    "de" to "German",
+    "it" to "Italian",
+    "pt" to "Portuguese",
+    "ru" to "Russian",
+    "tr" to "Turkish",
+    "ar" to "Arabic",
+    "hi" to "Hindi",
+    "bn" to "Bengali",
+    "id" to "Indonesian",
+    "th" to "Thai",
+    "vi" to "Vietnamese",
+)
