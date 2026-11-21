@@ -330,6 +330,11 @@ class ReaderViewModel(
         translationManager.refreshMarking(currentPages())
     }
 
+    fun scanForReadAloud() {
+        val chapter = state.value.currentChapter ?: return
+        translationManager.scanForReadAloud(chapter, (state.value.currentPage - 1).coerceAtLeast(0))
+    }
+
     fun toggleTranslated() {
         translationManager.toggleShowTranslated(currentPages())
     }

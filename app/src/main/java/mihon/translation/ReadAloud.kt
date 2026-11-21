@@ -46,13 +46,19 @@ class ReadAloud(
         return value
     }
 
-    fun speak(view: ReaderPageImageView, box: TextBox) {
+    fun speak(view: ReaderPageImageView, box: TextBox, locale: Locale) {
         clearFrame()
         framedView = view
         view.readAloudBox = RectF(box.left, box.top, box.right, box.bottom)
         val utterance = "box-${utteranceCounter++}"
         currentUtterance = utterance
         withTts { engine ->
+            val result = engine.setLanguage(locale)
+            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                context.toast("This speech engine has no ${locale.displayLanguage} voice installed.")
+                clearFrame()
+                return@withTts
+            }
             engine.setSpeechRate(preferences.ttsSpeechRate.get() / 100f)
             engine.speak(box.text, TextToSpeech.QUEUE_FLUSH, null, utterance)
         }
@@ -61,6 +67,7 @@ class ReadAloud(
     fun test(text: String) {
         clearFrame()
         withTts { engine ->
+            engine.setLanguage(Locale.ENGLISH)
             engine.setSpeechRate(preferences.ttsSpeechRate.get() / 100f)
             engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "test")
         }
@@ -127,10 +134,6 @@ class ReadAloud(
                         pending = null
                     }
                     return@post
-                }
-                val result = created.setLanguage(Locale.ENGLISH)
-                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                    context.toast("This speech engine has no English voice installed.")
                 }
                 created.setOnUtteranceProgressListener(
                     object : UtteranceProgressListener() {

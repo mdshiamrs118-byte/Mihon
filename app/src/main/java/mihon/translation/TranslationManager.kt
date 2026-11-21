@@ -55,6 +55,7 @@ class TranslationManager(
     val showingTranslated: StateFlow<Boolean> = mutableShown.asStateFlow()
 
     private var job: Job? = null
+    private var scanJob: Job? = null
     private val downloadJobs = HashMap<String, Job>()
 
     init {
@@ -78,6 +79,68 @@ class TranslationManager(
 
     fun stop() {
         job?.cancel()
+        scanJob?.cancel()
+    }
+
+    /** Finds the text boxes of every page of the chapter, from [startIndex] on and then the earlier pages. */
+    fun scanForReadAloud(chapter: ReaderChapter, startIndex: Int) {
+        if (scanJob?.isActive == true) return
+        val pages = chapter.pages ?: return
+        if (pages.isEmpty()) return
+        val language = Langs.byCode(preferences.sourceLanguage.get())
+        scanJob = scope.launch(Dispatchers.Default) {
+            scan(chapter, pages, startIndex.coerceIn(0, pages.lastIndex), language)
+        }
+    }
+
+    fun stopScan() {
+        scanJob?.cancel()
+    }
+
+    private suspend fun scan(chapter: ReaderChapter, pages: List<ReaderPage>, start: Int, language: Lang) {
+        val ocr = Ocr()
+        try {
+            for (i in (start until pages.size) + (0 until start)) {
+                currentCoroutineContext().ensureActive()
+                val page = pages[i]
+                if (TranslationStore.hasOcr(page) || TranslationStore.find(page)?.boxes?.isNotEmpty() == true) continue
+                scanStatus(true, "Read aloud: scanning page ${i + 1}/${pages.size}…")
+                val bytes = readPage(chapter, page) ?: continue
+                val bitmap = withContext(Dispatchers.IO) { PageImages.decodeForOcr(bytes) } ?: continue
+                try {
+                    val blocks = ocr.recognize(bitmap, language.script) { }
+                    val boxes = Grouping.group(blocks, language.script).map {
+                        TextBox(
+                            it.box.l.toFloat() / bitmap.width,
+                            it.box.t.toFloat() / bitmap.height,
+                            it.box.r.toFloat() / bitmap.width,
+                            it.box.b.toFloat() / bitmap.height,
+                            it.text,
+                        )
+                    }
+                    withContext(Dispatchers.IO) { TranslationStore.writeOcr(page, boxes) }
+                } finally {
+                    bitmap.recycle()
+                }
+            }
+            scanStatus(false, "Read aloud is ready for this chapter.")
+        } catch (e: CancellationException) {
+            scanStatus(false, null)
+            throw e
+        } catch (e: Throwable) {
+            scanStatus(false, "Read aloud scan failed: ${e.message ?: e.javaClass.simpleName}")
+        } finally {
+            ocr.close()
+        }
+    }
+
+    private fun scanStatus(running: Boolean, message: String?) {
+        if (job?.isActive == true) return
+        if (running || message == null) {
+            setStatus(running, message)
+        } else {
+            finish(message)
+        }
     }
 
     fun toggleShowTranslated(pages: List<ReaderPage>) {
@@ -149,6 +212,19 @@ class TranslationManager(
                     val blocks = ocr.recognize(bitmap, language.script) { setStatus(true, "$label: $it") }
                     val bubbles = Grouping.group(blocks, language.script)
                     if (bubbles.isEmpty()) continue
+
+                    if (!TranslationStore.hasOcr(page)) {
+                        val scanned = bubbles.map {
+                            TextBox(
+                                it.box.l.toFloat() / bitmap.width,
+                                it.box.t.toFloat() / bitmap.height,
+                                it.box.r.toFloat() / bitmap.width,
+                                it.box.b.toFloat() / bitmap.height,
+                                it.text,
+                            )
+                        }
+                        withContext(Dispatchers.IO) { TranslationStore.writeOcr(page, scanned) }
+                    }
 
                     val texts = bubbles.map { it.text }
                     val onProgress: (Int, Int) -> Unit = { done, total ->

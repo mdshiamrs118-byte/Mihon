@@ -1141,6 +1141,7 @@
     <string name="pref_read_aloud_summary">Speech engine and speed</string>
     <string name="action_read_aloud">Read aloud</string>
     <string name="read_aloud_on">Read aloud on: tap translated text to hear it</string>
+    <string name="read_aloud_scanning">Scanning this chapter for text. Tap again in a moment</string>
     <string name="read_aloud_off">Read aloud off</string>
     <string name="pref_read_aloud_voice">Voice</string>
     <string name="pref_read_aloud_info">Speaks the translated text of the box you tap, in English, while read aloud is on in the reader.</string>

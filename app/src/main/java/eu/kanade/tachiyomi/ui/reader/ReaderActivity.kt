@@ -120,6 +120,7 @@ import kotlinx.coroutines.launch
 import logcat.LogPriority
 import mihon.app.di.AppGraph
 import mihon.core.metro.metroGraph
+import mihon.translation.Langs
 import mihon.translation.TranslationDisplay
 import mihon.translation.TranslationStore
 import mihon.translation.WebAiHost
@@ -129,6 +130,7 @@ import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.screens.LoadingScreen
 import tachiyomi.presentation.core.util.collectAsState
+import java.util.Locale
 import kotlin.math.hypot
 
 class ReaderActivity : BaseActivity() {
@@ -687,8 +689,10 @@ class ReaderActivity : BaseActivity() {
     private fun toggleReadAloud() {
         if (graph.readAloud.toggle()) {
             hideMenu()
+            viewModel.scanForReadAloud()
             toast(MR.strings.read_aloud_on)
         } else {
+            viewModel.translationManager.stopScan()
             toast(MR.strings.read_aloud_off)
         }
     }
@@ -723,19 +727,35 @@ class ReaderActivity : BaseActivity() {
 
     /** Speaks the translated text box under a tap; false when there is none so the tap keeps its normal meaning. */
     private fun readTextAt(x: Float, y: Float): Boolean {
-        if (!TranslationDisplay.showTranslated) return false
         val view = findPageView(window.decorView, x.toInt(), y.toInt()) ?: return false
         val page = view.readAloudPage ?: return false
-        val translated = page.translation ?: TranslationStore.find(page) ?: return false
         val point = view.screenToImageFraction(x, y) ?: return false
+        val translated = if (TranslationDisplay.showTranslated) {
+            page.translation ?: TranslationStore.find(page)
+        } else {
+            null
+        }
+        var boxes = translated?.boxes.orEmpty()
+        var locale = Locale.ENGLISH
+        if (boxes.isEmpty()) {
+            boxes = TranslationStore.readOcr(page)
+            locale = Locale.forLanguageTag(Langs.byCode(graph.translationPreferences.sourceLanguage.get()).code)
+        }
+        if (boxes.isEmpty()) {
+            if (!TranslationStore.hasOcr(page)) {
+                viewModel.translationManager.scanForReadAloud(page.chapter, page.index)
+                toast(MR.strings.read_aloud_scanning)
+            }
+            return false
+        }
         val margin = 0.01f
-        val box = translated.boxes
+        val box = boxes
             .filter {
                 point.x in (it.left - margin)..(it.right + margin) && point.y in (it.top - margin)..(it.bottom + margin)
             }
             .minByOrNull { (it.right - it.left) * (it.bottom - it.top) }
             ?: return false
-        graph.readAloud.speak(view, box)
+        graph.readAloud.speak(view, box, locale)
         return true
     }
 

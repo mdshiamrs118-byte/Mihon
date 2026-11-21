@@ -40,7 +40,22 @@ object TranslationStore {
 
     private fun boxesOf(file: File): File = File(file.path.removeSuffix(".jpg") + ".json")
 
-    fun writeBoxes(file: File, boxes: List<TextBox>) {
+    private fun ocrOf(page: ReaderPage): File = File(fileFor(page).path.removeSuffix(".jpg") + "_ocr.json")
+
+    /** Text boxes with the original text, scanned for read aloud; the file exists (maybe empty) once a page was scanned. */
+    fun hasOcr(page: ReaderPage): Boolean = ocrOf(page).exists()
+
+    fun readOcr(page: ReaderPage): List<TextBox> = readBoxesFrom(ocrOf(page))
+
+    fun writeOcr(page: ReaderPage, boxes: List<TextBox>) {
+        val target = ocrOf(page)
+        target.parentFile?.mkdirs()
+        writeBoxesTo(target, boxes)
+    }
+
+    fun writeBoxes(file: File, boxes: List<TextBox>) = writeBoxesTo(boxesOf(file), boxes)
+
+    private fun writeBoxesTo(target: File, boxes: List<TextBox>) {
         val array = JSONArray()
         boxes.forEach {
             array.put(
@@ -52,11 +67,12 @@ object TranslationStore {
                     .put("text", it.text),
             )
         }
-        boxesOf(file).writeText(array.toString())
+        target.writeText(array.toString())
     }
 
-    fun readBoxes(file: File): List<TextBox> {
-        val source = boxesOf(file)
+    fun readBoxes(file: File): List<TextBox> = readBoxesFrom(boxesOf(file))
+
+    private fun readBoxesFrom(source: File): List<TextBox> {
         if (!source.exists()) return emptyList()
         return try {
             val array = JSONArray(source.readText())
