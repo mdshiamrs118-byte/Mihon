@@ -7,6 +7,10 @@ object ReadAloudDisplay {
 
     @Volatile
     var active: Boolean = false
+
+    /** The text language the scanned boxes belong to. */
+    @Volatile
+    var language: String = "ko"
 }
 
 object ReadAloudBoxes {
@@ -17,8 +21,12 @@ object ReadAloudBoxes {
             val translated = (page.translation ?: TranslationStore.find(page))?.boxes.orEmpty()
             if (translated.isNotEmpty()) return translated to true
         }
-        page.scannedBoxes?.let { return it to false }
-        if (!TranslationStore.hasOcr(page)) return emptyList<TextBox>() to false
-        return TranslationStore.readOcr(page).also { page.scannedBoxes = it } to false
+        val language = ReadAloudDisplay.language
+        if (page.scannedLanguage == language) page.scannedBoxes?.let { return it to false }
+        if (!TranslationStore.hasOcr(page, language)) return emptyList<TextBox>() to false
+        return TranslationStore.readOcr(page, language).also {
+            page.scannedBoxes = it
+            page.scannedLanguage = language
+        } to false
     }
 }

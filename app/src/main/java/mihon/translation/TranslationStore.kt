@@ -40,15 +40,16 @@ object TranslationStore {
 
     private fun boxesOf(file: File): File = File(file.path.removeSuffix(".jpg") + ".json")
 
-    private fun ocrOf(page: ReaderPage): File = File(fileFor(page).path.removeSuffix(".jpg") + "_ocr.json")
+    private fun ocrOf(page: ReaderPage, language: String): File =
+        File(fileFor(page).path.removeSuffix(".jpg") + "_ocr_$language.json")
 
-    /** Text boxes with the original text, scanned for read aloud; the file exists (maybe empty) once a page was scanned. */
-    fun hasOcr(page: ReaderPage): Boolean = ocrOf(page).exists()
+    /** Scanned text boxes are kept per text language; the file exists (maybe empty) once a page was scanned. */
+    fun hasOcr(page: ReaderPage, language: String): Boolean = ocrOf(page, language).exists()
 
-    fun readOcr(page: ReaderPage): List<TextBox> = readBoxesFrom(ocrOf(page))
+    fun readOcr(page: ReaderPage, language: String): List<TextBox> = readBoxesFrom(ocrOf(page, language))
 
-    fun writeOcr(page: ReaderPage, boxes: List<TextBox>) {
-        val target = ocrOf(page)
+    fun writeOcr(page: ReaderPage, language: String, boxes: List<TextBox>) {
+        val target = ocrOf(page, language)
         target.parentFile?.mkdirs()
         writeBoxesTo(target, boxes)
     }

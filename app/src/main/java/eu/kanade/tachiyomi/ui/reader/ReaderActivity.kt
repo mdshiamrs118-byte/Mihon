@@ -122,6 +122,7 @@ import mihon.app.di.AppGraph
 import mihon.core.metro.metroGraph
 import mihon.translation.Langs
 import mihon.translation.ReadAloudBoxes
+import mihon.translation.ReadAloudDisplay
 import mihon.translation.TranslationStore
 import mihon.translation.WebAiHost
 import tachiyomi.core.common.Constants
@@ -438,6 +439,7 @@ class ReaderActivity : BaseActivity() {
         super.onResume()
         viewModel.restartReadTimer()
         viewModel.refreshTranslationMarking()
+        if (graph.readAloud.active.value) viewModel.scanForReadAloud()
         setMenuVisibility(viewModel.state.value.menuVisible)
     }
 
@@ -737,7 +739,7 @@ class ReaderActivity : BaseActivity() {
             Locale.forLanguageTag(Langs.byCode(graph.translationPreferences.sourceLanguage.get()).code)
         }
         if (boxes.isEmpty()) {
-            if (!TranslationStore.hasOcr(page)) {
+            if (!TranslationStore.hasOcr(page, ReadAloudDisplay.language)) {
                 viewModel.translationManager.scanForReadAloud(page.chapter, page.index)
                 toast(MR.strings.read_aloud_scanning)
             }

@@ -29,6 +29,9 @@ open class ReaderPage(
     @Volatile
     var scannedBoxes: List<TextBox>? = null
 
+    @Volatile
+    var scannedLanguage: String? = null
+
     private val translationChanges = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     /** Emits when the translated image of this page appears, changes or should be shown or hidden. */

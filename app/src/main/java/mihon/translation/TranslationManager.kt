@@ -61,6 +61,7 @@ class TranslationManager(
     init {
         TranslationStore.init(context.filesDir)
         TranslationDisplay.markFallback = preferences.markFallback.get()
+        ReadAloudDisplay.language = preferences.sourceLanguage.get()
     }
 
     // region Reader
@@ -99,14 +100,20 @@ class TranslationManager(
 
     private suspend fun scan(chapter: ReaderChapter, pages: List<ReaderPage>, start: Int, language: Lang) {
         val ocr = Ocr()
+        var unreadable = 0
         try {
             for (i in (start until pages.size) + (0 until start)) {
                 currentCoroutineContext().ensureActive()
                 val page = pages[i]
-                if (TranslationStore.hasOcr(page) || TranslationStore.find(page)?.boxes?.isNotEmpty() == true) continue
+                val translatedBoxes = TranslationStore.find(page)?.boxes.orEmpty()
+                if (TranslationStore.hasOcr(page, language.code) || translatedBoxes.isNotEmpty()) continue
                 scanStatus(true, "Read aloud: scanning page ${i + 1}/${pages.size}…")
-                val bytes = readPage(chapter, page) ?: continue
-                val bitmap = withContext(Dispatchers.IO) { PageImages.decodeForOcr(bytes) } ?: continue
+                val bytes = readPage(chapter, page)
+                val bitmap = bytes?.let { withContext(Dispatchers.IO) { PageImages.decodeForOcr(it) } }
+                if (bitmap == null) {
+                    unreadable++
+                    continue
+                }
                 try {
                     val blocks = ocr.recognize(bitmap, language.script) { }
                     val boxes = Grouping.group(blocks, language.script).map {
@@ -118,13 +125,21 @@ class TranslationManager(
                             it.text,
                         )
                     }
-                    withContext(Dispatchers.IO) { TranslationStore.writeOcr(page, boxes) }
+                    withContext(Dispatchers.IO) { TranslationStore.writeOcr(page, language.code, boxes) }
                     page.scannedBoxes = boxes
+                    page.scannedLanguage = language.code
                 } finally {
                     bitmap.recycle()
                 }
             }
-            scanStatus(false, "Read aloud is ready for this chapter.")
+            scanStatus(
+                false,
+                if (unreadable == 0) {
+                    "Read aloud is ready for this chapter."
+                } else {
+                    "Read aloud scan done, but $unreadable page(s) could not be read."
+                },
+            )
         } catch (e: CancellationException) {
             scanStatus(false, null)
             throw e
@@ -155,6 +170,7 @@ class TranslationManager(
     }
 
     fun refreshMarking(pages: List<ReaderPage>) {
+        ReadAloudDisplay.language = preferences.sourceLanguage.get()
         val mark = preferences.markFallback.get()
         if (TranslationDisplay.markFallback == mark) return
         TranslationDisplay.markFallback = mark
@@ -215,7 +231,7 @@ class TranslationManager(
                     val bubbles = Grouping.group(blocks, language.script)
                     if (bubbles.isEmpty()) continue
 
-                    if (!TranslationStore.hasOcr(page)) {
+                    if (!TranslationStore.hasOcr(page, language.code)) {
                         val scanned = bubbles.map {
                             TextBox(
                                 it.box.l.toFloat() / bitmap.width,
@@ -225,8 +241,9 @@ class TranslationManager(
                                 it.text,
                             )
                         }
-                        withContext(Dispatchers.IO) { TranslationStore.writeOcr(page, scanned) }
+                        withContext(Dispatchers.IO) { TranslationStore.writeOcr(page, language.code, scanned) }
                         page.scannedBoxes = scanned
+                        page.scannedLanguage = language.code
                     }
 
                     val texts = bubbles.map { it.text }

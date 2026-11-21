@@ -43,6 +43,7 @@ class ReadAloud(
         val value = !mutableActive.value
         mutableActive.value = value
         ReadAloudDisplay.active = value
+        ReadAloudDisplay.language = preferences.sourceLanguage.get()
         if (!value) release()
         return value
     }
