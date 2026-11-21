@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.ui.reader.viewer.pager
 import android.annotation.SuppressLint
 import android.content.Context
 import eu.kanade.tachiyomi.source.model.Page
+import eu.kanade.tachiyomi.ui.reader.model.InsertPage
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderPageErrorView
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderPageImageView
@@ -55,6 +56,7 @@ class PagerPageHolder(
     private var loadJob: Job? = null
 
     init {
+        readAloudPage = page.takeUnless { it is InsertPage }
         pageColorFilter = viewer.pageColorFilter
         loadJob = scope.launch { loadPageAndProcessStatus() }
     }

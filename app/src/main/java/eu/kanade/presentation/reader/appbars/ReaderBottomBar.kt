@@ -8,6 +8,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,6 +28,7 @@ import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.rounded.Crop
 import mihon.icons.materialsymbols.rounded.Settings
 import mihon.icons.materialsymbols.rounded.Translate
+import mihon.icons.materialsymbols.rounded.VolumeUp
 import mihon.translation.TranslationStatus
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
@@ -112,6 +115,8 @@ fun ReaderBottomBar(
     orientation: ReaderOrientation,
     onClickOrientation: () -> Unit,
     translate: ReaderTranslateActions,
+    readAloudActive: Boolean,
+    onClickReadAloud: () -> Unit,
     cropEnabled: Boolean,
     onClickCropBorder: () -> Unit,
     onClickSettings: () -> Unit,
@@ -131,6 +136,14 @@ fun ReaderBottomBar(
         }
 
         TranslateButton(translate)
+
+        IconButton(onClick = onClickReadAloud) {
+            Icon(
+                imageVector = MaterialSymbols.Rounded.VolumeUp,
+                contentDescription = stringResource(MR.strings.action_read_aloud),
+                tint = if (readAloudActive) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+            )
+        }
 
         IconButton(onClick = onClickOrientation) {
             Icon(

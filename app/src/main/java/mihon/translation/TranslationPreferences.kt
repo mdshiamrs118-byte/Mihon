@@ -35,6 +35,10 @@ class TranslationPreferences(
 
     val apiModel: Preference<String> = preferenceStore.getString(Preference.privateKey("pref_translation_api_model"), "")
 
+    val ttsEngine: Preference<String> = preferenceStore.getString("pref_read_aloud_engine", "")
+
+    val ttsSpeechRate: Preference<Int> = preferenceStore.getInt("pref_read_aloud_rate", 100)
+
     fun online() = OnlineConfig(apiBaseUrl.get(), apiKey.get(), apiModel.get())
 
     fun signedIn(siteId: String) = preferenceStore.getBoolean("pref_translation_signed_in_$siteId", false)

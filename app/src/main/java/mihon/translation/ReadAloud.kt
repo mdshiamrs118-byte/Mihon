@@ -1,0 +1,163 @@
+package mihon.translation
+
+import android.content.Context
+import android.content.Intent
+import android.graphics.RectF
+import android.os.Handler
+import android.os.Looper
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import eu.kanade.tachiyomi.ui.reader.viewer.ReaderPageImageView
+import eu.kanade.tachiyomi.util.system.toast
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import java.util.Locale
+
+/** Speaks translated text boxes through Android's TextToSpeech and frames the box being read. */
+@Inject
+@SingleIn(AppScope::class)
+class ReadAloud(
+    private val context: Context,
+    private val preferences: TranslationPreferences,
+) {
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    private val mutableActive = MutableStateFlow(false)
+    val active: StateFlow<Boolean> = mutableActive.asStateFlow()
+
+    private var tts: TextToSpeech? = null
+    private var ttsEngine: String? = null
+    private var ready = false
+    private var pending: (() -> Unit)? = null
+
+    private var framedView: ReaderPageImageView? = null
+    private var utteranceCounter = 0L
+    private var currentUtterance: String? = null
+
+    fun toggle(): Boolean {
+        val value = !mutableActive.value
+        mutableActive.value = value
+        if (!value) release()
+        return value
+    }
+
+    fun speak(view: ReaderPageImageView, box: TextBox) {
+        clearFrame()
+        framedView = view
+        view.readAloudBox = RectF(box.left, box.top, box.right, box.bottom)
+        val utterance = "box-${utteranceCounter++}"
+        currentUtterance = utterance
+        withTts { engine ->
+            engine.setSpeechRate(preferences.ttsSpeechRate.get() / 100f)
+            engine.speak(box.text, TextToSpeech.QUEUE_FLUSH, null, utterance)
+        }
+    }
+
+    fun test(text: String) {
+        clearFrame()
+        withTts { engine ->
+            engine.setSpeechRate(preferences.ttsSpeechRate.get() / 100f)
+            engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "test")
+        }
+    }
+
+    fun stop() {
+        tts?.stop()
+        clearFrame()
+    }
+
+    /** The installed text-to-speech engines by package name, with "" for the system default. */
+    @Suppress("DEPRECATION")
+    fun engines(): Map<String, String> {
+        val pm = context.packageManager
+        val services = pm.queryIntentServices(Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE), 0)
+        val installed = services
+            .associate { it.serviceInfo.packageName to it.loadLabel(pm).toString() }
+            .toList()
+            .sortedBy { it.second.lowercase() }
+        return linkedMapOf("" to "") + installed
+    }
+
+    private fun clearFrame() {
+        currentUtterance = null
+        framedView?.readAloudBox = null
+        framedView = null
+    }
+
+    private fun release() {
+        clearFrame()
+        tts?.shutdown()
+        tts = null
+        ttsEngine = null
+        ready = false
+        pending = null
+    }
+
+    private fun withTts(action: (TextToSpeech) -> Unit) {
+        val wanted = preferences.ttsEngine.get()
+        if (tts != null && ttsEngine != wanted) release()
+        val existing = tts
+        if (existing != null && ready) {
+            action(existing)
+            return
+        }
+        pending = { tts?.let(action) }
+        if (existing == null) start(wanted)
+    }
+
+    private fun start(engine: String) {
+        ttsEngine = engine
+        lateinit var created: TextToSpeech
+        val onInit = TextToSpeech.OnInitListener { status ->
+            mainHandler.post {
+                if (status != TextToSpeech.SUCCESS) {
+                    created.shutdown()
+                    if (tts === created) tts = null
+                    if (engine.isNotEmpty()) {
+                        context.toast("That speech engine failed to start. Using the default engine.")
+                        preferences.ttsEngine.set("")
+                        start("")
+                    } else {
+                        context.toast("Text-to-speech failed to start.")
+                        pending = null
+                    }
+                    return@post
+                }
+                val result = created.setLanguage(Locale.ENGLISH)
+                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    context.toast("This speech engine has no English voice installed.")
+                }
+                created.setOnUtteranceProgressListener(
+                    object : UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String) = Unit
+
+                        override fun onDone(utteranceId: String) = finished(utteranceId)
+
+                        @Deprecated("Deprecated in Java")
+                        override fun onError(utteranceId: String) = finished(utteranceId)
+                    },
+                )
+                ready = true
+                pending?.invoke()
+                pending = null
+            }
+        }
+        created = if (engine.isEmpty()) {
+            TextToSpeech(context, onInit)
+        } else {
+            TextToSpeech(context, onInit, engine)
+        }
+        tts = created
+    }
+
+    private fun finished(utteranceId: String) {
+        mainHandler.post {
+            if (utteranceId == currentUtterance) clearFrame()
+        }
+    }
+}

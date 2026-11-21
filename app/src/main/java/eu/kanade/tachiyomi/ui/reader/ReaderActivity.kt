@@ -8,6 +8,10 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.view.MotionEvent
+import android.view.View
+import android.view.ViewConfiguration
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
@@ -94,6 +98,7 @@ import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderSettingsViewModel
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
 import eu.kanade.tachiyomi.ui.reader.viewer.LocalPageColorFilter
+import eu.kanade.tachiyomi.ui.reader.viewer.ReaderPageImageView
 import eu.kanade.tachiyomi.ui.reader.viewer.Viewer
 import eu.kanade.tachiyomi.ui.reader.viewer.ViewerNavigation.Action
 import eu.kanade.tachiyomi.ui.reader.viewer.ViewerNavigation.NavigationRegion
@@ -115,6 +120,8 @@ import kotlinx.coroutines.launch
 import logcat.LogPriority
 import mihon.app.di.AppGraph
 import mihon.core.metro.metroGraph
+import mihon.translation.TranslationDisplay
+import mihon.translation.TranslationStore
 import mihon.translation.WebAiHost
 import tachiyomi.core.common.Constants
 import tachiyomi.core.common.i18n.stringResource
@@ -122,10 +129,16 @@ import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.screens.LoadingScreen
 import tachiyomi.presentation.core.util.collectAsState
+import kotlin.math.hypot
 
 class ReaderActivity : BaseActivity() {
 
     private val graph: AppGraph by lazy { metroGraph() }
+
+    private var tapCandidate = false
+    private var tapDownX = 0f
+    private var tapDownY = 0f
+    private var tapDownTime = 0L
 
     companion object {
         fun newIntent(context: Context, mangaId: Long?, chapterId: Long?): Intent {
@@ -402,7 +415,10 @@ class ReaderActivity : BaseActivity() {
     override fun onDestroy() {
         super.onDestroy()
         viewer?.destroy()
-        if (!isChangingConfigurations) WebAiHost.container = null
+        if (!isChangingConfigurations) {
+            WebAiHost.container = null
+            graph.readAloud.stop()
+        }
         menuToggleToast?.cancel()
         readingModeToast?.cancel()
     }
@@ -556,6 +572,7 @@ class ReaderActivity : BaseActivity() {
         val cropEnabled = if (isPagerType) cropBorderPaged else cropBorderWebtoon
 
         val translationStatus by viewModel.translationManager.status.collectAsState()
+        val readAloudActive by graph.readAloud.active.collectAsState()
         val showingTranslated by viewModel.translationManager.showingTranslated.collectAsState()
 
         val verticalNavigatorModes by readerPreferences.verticalNavigator.collectAsState()
@@ -612,6 +629,8 @@ class ReaderActivity : BaseActivity() {
                 viewModel.getMangaOrientation(resolveDefault = false),
             ),
             onClickOrientation = viewModel::openOrientationModeSelectDialog,
+            readAloudActive = readAloudActive,
+            onClickReadAloud = ::toggleReadAloud,
             translate = ReaderTranslateActions(
                 status = translationStatus,
                 showingTranslated = showingTranslated,
@@ -663,6 +682,77 @@ class ReaderActivity : BaseActivity() {
         }
 
         isLoadingViewer = true
+    }
+
+    private fun toggleReadAloud() {
+        if (graph.readAloud.toggle()) {
+            hideMenu()
+            toast(MR.strings.read_aloud_on)
+        } else {
+            toast(MR.strings.read_aloud_off)
+        }
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        val readAloud = graph.readAloud
+        if (!readAloud.active.value || viewModel.state.value.menuVisible) return super.dispatchTouchEvent(ev)
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                tapCandidate = true
+                tapDownX = ev.rawX
+                tapDownY = ev.rawY
+                tapDownTime = ev.eventTime
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val slop = ViewConfiguration.get(this).scaledTouchSlop
+                if (hypot(ev.rawX - tapDownX, ev.rawY - tapDownY) > slop) tapCandidate = false
+            }
+            MotionEvent.ACTION_UP -> {
+                val isTap = tapCandidate && ev.eventTime - tapDownTime < ViewConfiguration.getLongPressTimeout()
+                tapCandidate = false
+                if (isTap && readTextAt(ev.rawX, ev.rawY)) {
+                    ev.action = MotionEvent.ACTION_CANCEL
+                    super.dispatchTouchEvent(ev)
+                    return true
+                }
+            }
+            MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_CANCEL -> tapCandidate = false
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    /** Speaks the translated text box under a tap; false when there is none so the tap keeps its normal meaning. */
+    private fun readTextAt(x: Float, y: Float): Boolean {
+        if (!TranslationDisplay.showTranslated) return false
+        val view = findPageView(window.decorView, x.toInt(), y.toInt()) ?: return false
+        val page = view.readAloudPage ?: return false
+        val translated = page.translation ?: TranslationStore.find(page) ?: return false
+        val point = view.screenToImageFraction(x, y) ?: return false
+        val margin = 0.01f
+        val box = translated.boxes
+            .filter {
+                point.x in (it.left - margin)..(it.right + margin) && point.y in (it.top - margin)..(it.bottom + margin)
+            }
+            .minByOrNull { (it.right - it.left) * (it.bottom - it.top) }
+            ?: return false
+        graph.readAloud.speak(view, box)
+        return true
+    }
+
+    private fun findPageView(root: View, x: Int, y: Int): ReaderPageImageView? {
+        if (!root.isShown) return null
+        val location = IntArray(2)
+        root.getLocationOnScreen(location)
+        if (x < location[0] || x >= location[0] + root.width || y < location[1] || y >= location[1] + root.height) {
+            return null
+        }
+        if (root is ReaderPageImageView && root.readAloudPage != null) return root
+        if (root is ViewGroup) {
+            for (i in root.childCount - 1 downTo 0) {
+                findPageView(root.getChildAt(i), x, y)?.let { return it }
+            }
+        }
+        return null
     }
 
     private fun openTranslationSettings() {

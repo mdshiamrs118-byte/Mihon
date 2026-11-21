@@ -1,10 +1,18 @@
 package mihon.translation
 
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 
+/** A translated text box as fractions of the page image, with the text drawn in it. */
+class TextBox(val left: Float, val top: Float, val right: Float, val bottom: Float, val text: String)
+
 /** A translated page file; [marked] is the same page with red outlines, only present when a fallback translator made it. */
-class TranslatedPage(val file: File, val marked: File?)
+class TranslatedPage(val file: File, val marked: File?) {
+
+    val boxes: List<TextBox> by lazy { TranslationStore.readBoxes(file) }
+}
 
 /** Translated pages are kept per chapter in the app's private storage so they survive closing the reader. */
 object TranslationStore {
@@ -28,6 +36,43 @@ object TranslationStore {
         val file = fileFor(page)
         if (!file.exists()) return null
         return TranslatedPage(file, markedOf(file).takeIf { it.exists() })
+    }
+
+    private fun boxesOf(file: File): File = File(file.path.removeSuffix(".jpg") + ".json")
+
+    fun writeBoxes(file: File, boxes: List<TextBox>) {
+        val array = JSONArray()
+        boxes.forEach {
+            array.put(
+                JSONObject()
+                    .put("l", it.left.toDouble())
+                    .put("t", it.top.toDouble())
+                    .put("r", it.right.toDouble())
+                    .put("b", it.bottom.toDouble())
+                    .put("text", it.text),
+            )
+        }
+        boxesOf(file).writeText(array.toString())
+    }
+
+    fun readBoxes(file: File): List<TextBox> {
+        val source = boxesOf(file)
+        if (!source.exists()) return emptyList()
+        return try {
+            val array = JSONArray(source.readText())
+            List(array.length()) {
+                val o = array.getJSONObject(it)
+                TextBox(
+                    o.getDouble("l").toFloat(),
+                    o.getDouble("t").toFloat(),
+                    o.getDouble("r").toFloat(),
+                    o.getDouble("b").toFloat(),
+                    o.getString("text"),
+                )
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 
     fun has(mangaId: Long, chapterId: Long): Boolean =

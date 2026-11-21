@@ -86,6 +86,7 @@ class WebtoonPageHolder(
      */
     fun bind(page: ReaderPage) {
         this.page = page
+        frame.readAloudPage = page
         frame.pageColorFilter = viewer.pageColorFilter
         loadJob?.cancel()
         loadJob = scope.launch { loadPageAndProcessStatus() }
@@ -111,6 +112,7 @@ class WebtoonPageHolder(
         loadJob = null
 
         removeErrorLayout()
+        frame.readAloudPage = null
         frame.recycle()
         progressIndicator.setProgress(0)
         progressContainer.isVisible = true

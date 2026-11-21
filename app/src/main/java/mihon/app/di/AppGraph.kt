@@ -44,6 +44,7 @@ import mihon.core.metro.IsDebugBuild
 import mihon.data.cache.ChapterCache
 import mihon.domain.extension.interactor.GetExtensionStoreCountAsFlow
 import mihon.domain.extension.repository.ExtensionStoreRepository
+import mihon.translation.ReadAloud
 import mihon.translation.TranslationManager
 import mihon.translation.TranslationPreferences
 import nl.adaptivity.xmlutil.serialization.XML
@@ -96,6 +97,8 @@ interface AppGraph : ViewModelGraph {
     val translationPreferences: TranslationPreferences
 
     val translationManager: TranslationManager
+
+    val readAloud: ReadAloud
 
     val crashLogUtil: CrashLogUtil
 

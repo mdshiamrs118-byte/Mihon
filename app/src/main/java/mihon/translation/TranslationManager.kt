@@ -183,6 +183,20 @@ class TranslationManager(
                     saveJpeg(clean, target)
                     clean.recycle()
 
+                    val boxes = bubbles.indices.mapNotNull { index ->
+                        val text = results.getOrNull(index)?.trim().orEmpty()
+                        if (text.isEmpty()) return@mapNotNull null
+                        val box = bubbles[index].box
+                        TextBox(
+                            box.l.toFloat() / bitmap.width,
+                            box.t.toFloat() / bitmap.height,
+                            box.r.toFloat() / bitmap.width,
+                            box.b.toFloat() / bitmap.height,
+                            text,
+                        )
+                    }
+                    withContext(Dispatchers.IO) { TranslationStore.writeBoxes(target, boxes) }
+
                     val marked = TranslationStore.markedOf(target)
                     if (usedFallback) {
                         val outlined = withContext(Dispatchers.Default) {

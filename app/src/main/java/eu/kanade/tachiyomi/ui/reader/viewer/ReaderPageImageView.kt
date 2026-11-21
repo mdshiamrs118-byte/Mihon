@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.ui.reader.viewer
 
 import android.content.Context
+import android.graphics.Canvas
 import android.graphics.ColorFilter
 import android.graphics.Paint
 import android.graphics.PointF
@@ -40,6 +41,7 @@ import com.github.chrisbanes.photoview.PhotoView
 import eu.kanade.tachiyomi.data.coil.ImageDecoder
 import eu.kanade.tachiyomi.data.coil.cropBorders
 import eu.kanade.tachiyomi.data.coil.webtoonStrips
+import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
 import eu.kanade.tachiyomi.ui.reader.viewer.webtoon.WebtoonStripImageView
 import eu.kanade.tachiyomi.util.system.animatorDurationScale
 import eu.kanade.tachiyomi.util.view.isVisibleOnScreen
@@ -62,6 +64,22 @@ open class ReaderPageImageView @JvmOverloads constructor(
 ) : FrameLayout(context, attrs, defStyleAttrs, defStyleRes) {
 
     private var pageView: View? = null
+
+    /** The page this view shows, for reading its text aloud; null for views that don't support it. */
+    var readAloudPage: ReaderPage? = null
+
+    /** Green frame around the text being read, as fractions of the image. */
+    var readAloudBox: RectF? = null
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    private val readAloudPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = 0xFF00C853.toInt()
+        strokeWidth = resources.displayMetrics.density * 3f
+    }
 
     /**
      * The reader's grayscale and inverted colours for the page image alone, so the transition and error views
@@ -196,6 +214,7 @@ open class ReaderPageImageView @JvmOverloads constructor(
     }
 
     fun recycle() {
+        readAloudBox = null
         stripRequest?.dispose()
         stripRequest = null
         pageView?.let {
@@ -206,6 +225,52 @@ open class ReaderPageImageView @JvmOverloads constructor(
             }
             it.isVisible = false
         }
+    }
+
+    /** Maps a point in screen pixels to fractions of the shown image, or null when it is off the image. */
+    fun screenToImageFraction(screenX: Float, screenY: Float): PointF? {
+        val view = pageView ?: return null
+        val location = IntArray(2)
+        view.getLocationOnScreen(location)
+        val x = screenX - location[0]
+        val y = screenY - location[1]
+        val fraction = when (view) {
+            is SubsamplingScaleImageView -> {
+                if (!view.isReady || view.sWidth <= 0 || view.sHeight <= 0) return null
+                val source = view.viewToSourceCoord(PointF(x, y)) ?: return null
+                PointF(source.x / view.sWidth, source.y / view.sHeight)
+            }
+            is WebtoonStripImageView -> {
+                if (view.width <= 0 || view.height <= 0) return null
+                PointF(x / view.width, y / view.height)
+            }
+            else -> return null
+        }
+        return fraction.takeIf { it.x in 0f..1f && it.y in 0f..1f }
+    }
+
+    override fun dispatchDraw(canvas: Canvas) {
+        super.dispatchDraw(canvas)
+        val box = readAloudBox ?: return
+        val view = pageView ?: return
+        val rect = when (view) {
+            is SubsamplingScaleImageView -> {
+                if (!view.isReady) return
+                val topLeft = view.sourceToViewCoord(PointF(box.left * view.sWidth, box.top * view.sHeight))
+                val bottomRight = view.sourceToViewCoord(PointF(box.right * view.sWidth, box.bottom * view.sHeight))
+                if (topLeft == null || bottomRight == null) return
+                RectF(topLeft.x, topLeft.y, bottomRight.x, bottomRight.y)
+            }
+            is WebtoonStripImageView -> RectF(
+                box.left * view.width,
+                box.top * view.height,
+                box.right * view.width,
+                box.bottom * view.height,
+            )
+            else -> return
+        }
+        rect.offset(view.left.toFloat(), view.top.toFloat())
+        canvas.drawRect(rect, readAloudPaint)
     }
 
     /**
