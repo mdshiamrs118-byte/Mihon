@@ -13,6 +13,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -134,7 +135,7 @@ class TranslationManager(
             var pagesWithText = 0
             var alreadyDone = 0
             for (i in start until pages.size) {
-                ensureActive()
+                currentCoroutineContext().ensureActive()
                 val page = pages[i]
                 if (page.translation != null || TranslationStore.find(page) != null) {
                     alreadyDone++
