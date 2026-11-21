@@ -105,8 +105,7 @@ class TranslationManager(
             for (i in (start until pages.size) + (0 until start)) {
                 currentCoroutineContext().ensureActive()
                 val page = pages[i]
-                val translatedBoxes = TranslationStore.find(page)?.boxes.orEmpty()
-                if (TranslationStore.hasOcr(page, language.code) || translatedBoxes.isNotEmpty()) continue
+                if (TranslationStore.hasOcr(page, language.code)) continue
                 scanStatus(true, "Read aloud: scanning page ${i + 1}/${pages.size}…")
                 val bytes = readPage(chapter, page)
                 val bitmap = bytes?.let { withContext(Dispatchers.IO) { PageImages.decodeForOcr(it) } }
@@ -116,7 +115,7 @@ class TranslationManager(
                 }
                 try {
                     val blocks = ocr.recognize(bitmap, language.script) { }
-                    val boxes = Grouping.group(blocks, language.script).map {
+                    val boxes = Grouping.group(blocks, language.script, anyText = true).map {
                         TextBox(
                             it.box.l.toFloat() / bitmap.width,
                             it.box.t.toFloat() / bitmap.height,
@@ -230,21 +229,6 @@ class TranslationManager(
                     val blocks = ocr.recognize(bitmap, language.script) { setStatus(true, "$label: $it") }
                     val bubbles = Grouping.group(blocks, language.script)
                     if (bubbles.isEmpty()) continue
-
-                    if (!TranslationStore.hasOcr(page, language.code)) {
-                        val scanned = bubbles.map {
-                            TextBox(
-                                it.box.l.toFloat() / bitmap.width,
-                                it.box.t.toFloat() / bitmap.height,
-                                it.box.r.toFloat() / bitmap.width,
-                                it.box.b.toFloat() / bitmap.height,
-                                it.text,
-                            )
-                        }
-                        withContext(Dispatchers.IO) { TranslationStore.writeOcr(page, language.code, scanned) }
-                        page.scannedBoxes = scanned
-                        page.scannedLanguage = language.code
-                    }
 
                     val texts = bubbles.map { it.text }
                     val onProgress: (Int, Int) -> Unit = { done, total ->

@@ -120,11 +120,11 @@ import kotlinx.coroutines.launch
 import logcat.LogPriority
 import mihon.app.di.AppGraph
 import mihon.core.metro.metroGraph
-import mihon.translation.Langs
 import mihon.translation.ReadAloudBoxes
 import mihon.translation.ReadAloudDisplay
 import mihon.translation.TranslationStore
 import mihon.translation.WebAiHost
+import mihon.translation.speechTagFor
 import tachiyomi.core.common.Constants
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.system.logcat
@@ -732,12 +732,7 @@ class ReaderActivity : BaseActivity() {
         val view = findPageView(window.decorView, x.toInt(), y.toInt()) ?: return false
         val page = view.readAloudPage ?: return false
         val point = view.screenToImageFraction(x, y) ?: return false
-        val (boxes, isTranslation) = ReadAloudBoxes.of(page)
-        val locale = if (isTranslation) {
-            Locale.ENGLISH
-        } else {
-            Locale.forLanguageTag(Langs.byCode(graph.translationPreferences.sourceLanguage.get()).code)
-        }
+        val boxes = ReadAloudBoxes.of(page)
         if (boxes.isEmpty()) {
             if (!TranslationStore.hasOcr(page, ReadAloudDisplay.language)) {
                 viewModel.translationManager.scanForReadAloud(page.chapter, page.index)
@@ -752,7 +747,8 @@ class ReaderActivity : BaseActivity() {
             }
             .minByOrNull { (it.right - it.left) * (it.bottom - it.top) }
             ?: return false
-        graph.readAloud.speak(view, box, locale)
+        val tag = if (box.translated) "en" else speechTagFor(box.text, ReadAloudDisplay.language)
+        graph.readAloud.speak(view, box, Locale.forLanguageTag(tag))
         return true
     }
 

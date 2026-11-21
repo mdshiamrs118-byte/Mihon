@@ -15,18 +15,30 @@ object ReadAloudDisplay {
 
 object ReadAloudBoxes {
 
-    /** The boxes to outline and read on [page], and whether their text is the translation. */
-    fun of(page: ReaderPage): Pair<List<TextBox>, Boolean> {
-        if (TranslationDisplay.showTranslated) {
-            val translated = (page.translation ?: TranslationStore.find(page))?.boxes.orEmpty()
-            if (translated.isNotEmpty()) return translated to true
+    /** Everything readable on [page]: translated boxes, plus the scanned text that was not translated. */
+    fun of(page: ReaderPage): List<TextBox> {
+        val translated = if (TranslationDisplay.showTranslated) {
+            (page.translation ?: TranslationStore.find(page))?.boxes.orEmpty()
+        } else {
+            emptyList()
         }
+        val scanned = scanned(page)
+        if (translated.isEmpty()) return scanned
+        val untranslated = scanned.filter { box ->
+            val x = (box.left + box.right) / 2
+            val y = (box.top + box.bottom) / 2
+            translated.none { x in it.left..it.right && y in it.top..it.bottom }
+        }
+        return translated + untranslated
+    }
+
+    private fun scanned(page: ReaderPage): List<TextBox> {
         val language = ReadAloudDisplay.language
-        if (page.scannedLanguage == language) page.scannedBoxes?.let { return it to false }
-        if (!TranslationStore.hasOcr(page, language)) return emptyList<TextBox>() to false
+        if (page.scannedLanguage == language) page.scannedBoxes?.let { return it }
+        if (!TranslationStore.hasOcr(page, language)) return emptyList()
         return TranslationStore.readOcr(page, language).also {
             page.scannedBoxes = it
             page.scannedLanguage = language
-        } to false
+        }
     }
 }

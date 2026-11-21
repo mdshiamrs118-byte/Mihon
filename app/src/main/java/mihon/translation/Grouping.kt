@@ -36,9 +36,13 @@ object Grouping {
         Script.CHINESE -> s.any { isHan(it) }
         Script.LATIN -> {
             val lower = s.lowercase()
-            val webAddress = lower.contains("www.") || lower.contains(".com") || lower.contains(".net") || lower.contains("http")
-            !webAddress && !looksEnglish(lower) && s.count { it.isLetter() } >= 2
+            !looksLikeWebAddress(s) && !looksEnglish(lower) && s.count { it.isLetter() } >= 2
         }
+    }
+
+    private fun looksLikeWebAddress(s: String): Boolean {
+        val lower = s.lowercase()
+        return lower.contains("www.") || lower.contains(".com") || lower.contains(".net") || lower.contains("http")
     }
 
     private val englishWords = setOf(
@@ -55,7 +59,7 @@ object Grouping {
      * OCR returns text in small blocks; translating them one by one breaks sentences.
      * Blocks that sit close together (relative to their line height) are merged into one bubble.
      */
-    fun group(blocks: List<OcrBlock>, script: Script = Script.KOREAN): List<Bubble> {
+    fun group(blocks: List<OcrBlock>, script: Script = Script.KOREAN, anyText: Boolean = false): List<Bubble> {
         val usable = blocks.filter { it.text.isNotBlank() && it.box.w > 0 && it.box.h > 0 }
         val n = usable.size
         if (n == 0) return emptyList()
@@ -89,7 +93,9 @@ object Grouping {
         for (members in clusters.values) {
             val ordered = members.sortedWith(compareBy({ it.box.t }, { it.box.l }))
             val text = ordered.joinToString(" ") { it.text.replace(spaces, " ").trim() }.trim()
-            if (!hasScript(script, text)) continue // skip sound-effect noise, numbers, watermarks
+            // skip sound-effect noise, numbers, watermarks; reading aloud keeps text in any script
+            val keep = if (anyText) text.any { it.isLetter() } && !looksLikeWebAddress(text) else hasScript(script, text)
+            if (!keep) continue
             var box = ordered[0].box
             for (m in ordered) box = box.union(m.box)
             bubbles.add(Bubble(text, box))

@@ -6,7 +6,14 @@ import org.json.JSONObject
 import java.io.File
 
 /** A translated text box as fractions of the page image, with the text drawn in it. */
-class TextBox(val left: Float, val top: Float, val right: Float, val bottom: Float, val text: String)
+class TextBox(
+    val left: Float,
+    val top: Float,
+    val right: Float,
+    val bottom: Float,
+    val text: String,
+    val translated: Boolean = false,
+)
 
 /** A translated page file; [marked] is the same page with red outlines, only present when a fallback translator made it. */
 class TranslatedPage(val file: File, val marked: File?) {
@@ -41,7 +48,7 @@ object TranslationStore {
     private fun boxesOf(file: File): File = File(file.path.removeSuffix(".jpg") + ".json")
 
     private fun ocrOf(page: ReaderPage, language: String): File =
-        File(fileFor(page).path.removeSuffix(".jpg") + "_ocr_$language.json")
+        File(fileFor(page).path.removeSuffix(".jpg") + "_read_$language.json")
 
     /** Scanned text boxes are kept per text language; the file exists (maybe empty) once a page was scanned. */
     fun hasOcr(page: ReaderPage, language: String): Boolean = ocrOf(page, language).exists()
@@ -71,9 +78,9 @@ object TranslationStore {
         target.writeText(array.toString())
     }
 
-    fun readBoxes(file: File): List<TextBox> = readBoxesFrom(boxesOf(file))
+    fun readBoxes(file: File): List<TextBox> = readBoxesFrom(boxesOf(file), translated = true)
 
-    private fun readBoxesFrom(source: File): List<TextBox> {
+    private fun readBoxesFrom(source: File, translated: Boolean = false): List<TextBox> {
         if (!source.exists()) return emptyList()
         return try {
             val array = JSONArray(source.readText())
@@ -85,6 +92,7 @@ object TranslationStore {
                     o.getDouble("r").toFloat(),
                     o.getDouble("b").toFloat(),
                     o.getString("text"),
+                    translated,
                 )
             }
         } catch (e: Exception) {

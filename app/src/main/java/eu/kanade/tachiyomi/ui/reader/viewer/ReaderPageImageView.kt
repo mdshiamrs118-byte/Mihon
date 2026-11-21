@@ -302,7 +302,7 @@ open class ReaderPageImageView @JvmOverloads constructor(
         val page = readAloudPage
         if (page != null && ReadAloudDisplay.active) {
             val rect = RectF()
-            ReadAloudBoxes.of(page).first.forEach {
+            ReadAloudBoxes.of(page).forEach {
                 rect.set(it.left, it.top, it.right, it.bottom)
                 boxToViewRect(rect)?.let { mapped -> canvas.drawRect(mapped, scannedPaint) }
             }

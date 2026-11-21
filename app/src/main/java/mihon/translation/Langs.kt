@@ -31,3 +31,12 @@ object Langs {
 
     fun byCode(code: String): Lang = all.firstOrNull { it.code == code } ?: all.first()
 }
+
+/** The language tag to speak [text] in: by its script, or the text language for Latin letters. */
+fun speechTagFor(text: String, sourceCode: String): String = when {
+    Grouping.hasHangul(text) -> "ko"
+    text.any { it in '\u3040'..'\u30FF' } -> "ja"
+    text.any { it in '\u4E00'..'\u9FFF' } -> "zh"
+    Langs.byCode(sourceCode).script == Script.LATIN -> sourceCode
+    else -> "en"
+}
