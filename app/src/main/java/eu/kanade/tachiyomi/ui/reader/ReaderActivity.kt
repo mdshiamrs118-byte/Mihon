@@ -74,6 +74,7 @@ import eu.kanade.presentation.reader.ReaderPageActionsDialog
 import eu.kanade.presentation.reader.ReaderPageIndicator
 import eu.kanade.presentation.reader.ReadingModeSelectDialog
 import eu.kanade.presentation.reader.appbars.ReaderAppBars
+import eu.kanade.presentation.reader.appbars.ReaderTranslateActions
 import eu.kanade.presentation.reader.components.ChapterNavigatorType
 import eu.kanade.presentation.reader.settings.ReaderSettingsDialog
 import eu.kanade.tachiyomi.R
@@ -114,6 +115,7 @@ import kotlinx.coroutines.launch
 import logcat.LogPriority
 import mihon.app.di.AppGraph
 import mihon.core.metro.metroGraph
+import mihon.translation.WebAiHost
 import tachiyomi.core.common.Constants
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.system.logcat
@@ -187,6 +189,8 @@ class ReaderActivity : BaseActivity() {
         windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 
         super.onCreate(savedInstanceState)
+
+        WebAiHost.container = findViewById(android.R.id.content)
 
         setComposeContent {
             val state by viewModel.state.collectAsState()
@@ -398,6 +402,7 @@ class ReaderActivity : BaseActivity() {
     override fun onDestroy() {
         super.onDestroy()
         viewer?.destroy()
+        if (!isChangingConfigurations) WebAiHost.container = null
         menuToggleToast?.cancel()
         readingModeToast?.cancel()
     }
@@ -414,6 +419,7 @@ class ReaderActivity : BaseActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.restartReadTimer()
+        viewModel.refreshTranslationMarking()
         setMenuVisibility(viewModel.state.value.menuVisible)
     }
 
@@ -549,6 +555,9 @@ class ReaderActivity : BaseActivity() {
         val isPagerType = ReadingMode.isPagerType(viewModel.getMangaReadingMode())
         val cropEnabled = if (isPagerType) cropBorderPaged else cropBorderWebtoon
 
+        val translationStatus by viewModel.translationManager.status.collectAsState()
+        val showingTranslated by viewModel.translationManager.showingTranslated.collectAsState()
+
         val verticalNavigatorModes by readerPreferences.verticalNavigator.collectAsState()
         val verticalNavigator = verticalNavigatorModes.contains(readingMode)
         val verticalNavigatorOnLeft by readerPreferences.verticalNavigatorOnLeft.collectAsState()
@@ -603,6 +612,15 @@ class ReaderActivity : BaseActivity() {
                 viewModel.getMangaOrientation(resolveDefault = false),
             ),
             onClickOrientation = viewModel::openOrientationModeSelectDialog,
+            translate = ReaderTranslateActions(
+                status = translationStatus,
+                showingTranslated = showingTranslated,
+                onTranslate = viewModel::translateFromCurrentPage,
+                onStop = viewModel.translationManager::stop,
+                onToggleShown = viewModel::toggleTranslated,
+                onDelete = viewModel::deleteTranslation,
+                onOpenSettings = ::openTranslationSettings,
+            ),
             cropEnabled = cropEnabled,
             onClickCropBorder = {
                 val enabled = viewModel.toggleCropBorders()
@@ -645,6 +663,15 @@ class ReaderActivity : BaseActivity() {
         }
 
         isLoadingViewer = true
+    }
+
+    private fun openTranslationSettings() {
+        startActivity(
+            Intent(this, MainActivity::class.java).apply {
+                action = Intent.ACTION_APPLICATION_PREFERENCES
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            },
+        )
     }
 
     private fun openMangaScreen() {

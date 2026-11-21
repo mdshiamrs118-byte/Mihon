@@ -12,6 +12,7 @@ import eu.kanade.presentation.more.settings.screen.SettingsMainScreen
 import eu.kanade.presentation.more.settings.screen.SettingsReaderScreen
 import eu.kanade.presentation.more.settings.screen.SettingsSearchScreen
 import eu.kanade.presentation.more.settings.screen.SettingsSecurityScreen
+import eu.kanade.presentation.more.settings.screen.SettingsTranslationScreen
 import eu.kanade.presentation.more.settings.screen.SettingsTrackingScreen
 import eu.kanade.presentation.more.settings.screen.about.AboutScreen
 import eu.kanade.presentation.more.settings.screen.about.OpenSourceLicensesScreen
@@ -205,6 +206,9 @@ fun EntryProviderScope<NavKey>.appEntries() {
     }
     entry<SettingsSecurityScreen> {
         SettingsSecurityScreen.Content()
+    }
+    entry<SettingsTranslationScreen> {
+        SettingsTranslationScreen.Content()
     }
     entry<SettingsTrackingScreen> {
         SettingsTrackingScreen.Content()

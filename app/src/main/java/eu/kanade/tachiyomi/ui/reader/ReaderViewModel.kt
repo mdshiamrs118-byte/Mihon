@@ -76,6 +76,8 @@ import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import mihon.core.metro.AppCoroutineScope
 import mihon.data.cache.ChapterCache
+import mihon.translation.TranslationManager
+import mihon.translation.TranslationStore
 import tachiyomi.core.common.preference.toggle
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.chapter.interactor.GetChaptersByMangaId
@@ -127,6 +129,7 @@ class ReaderViewModel(
     private val coverCache: CoverCache,
     private val chapterCache: ChapterCache,
     private val downloadCache: DownloadCache,
+    val translationManager: TranslationManager,
 ) : ViewModel() {
 
     @AssistedFactory
@@ -318,7 +321,33 @@ class ReaderViewModel(
         }
     }
 
+    fun translateFromCurrentPage() {
+        val chapter = state.value.currentChapter ?: return
+        translationManager.translate(chapter, (state.value.currentPage - 1).coerceAtLeast(0))
+    }
+
+    fun refreshTranslationMarking() {
+        translationManager.refreshMarking(currentPages())
+    }
+
+    fun toggleTranslated() {
+        translationManager.toggleShowTranslated(currentPages())
+    }
+
+    fun deleteTranslation() {
+        val chapter = state.value.currentChapter ?: return
+        translationManager.deleteTranslation(chapter.chapter.mangaId, chapter.chapter.id, currentPages())
+    }
+
+    fun hasTranslation(): Boolean {
+        val chapter = state.value.currentChapter ?: return false
+        return TranslationStore.has(chapter.chapter.mangaId, chapter.chapter.id)
+    }
+
+    private fun currentPages(): List<ReaderPage> = state.value.currentChapter?.pages.orEmpty()
+
     override fun onCleared() {
+        translationManager.stop()
         val currentChapters = state.value.viewerChapters
         if (currentChapters != null) {
             currentChapters.unref()

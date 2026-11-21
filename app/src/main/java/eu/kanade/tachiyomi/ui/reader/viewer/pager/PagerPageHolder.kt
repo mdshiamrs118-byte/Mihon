@@ -90,6 +90,11 @@ class PagerPageHolder(
             launch(Dispatchers.IO) {
                 loader.loadPage(page)
             }
+            launch {
+                page.translationFlow.collect {
+                    if (page.status == Page.State.Ready) setImage()
+                }
+            }
             page.statusFlow.collectLatest { state ->
                 when (state) {
                     Page.State.Queue -> setQueued()
@@ -140,7 +145,7 @@ class PagerPageHolder(
     private suspend fun setImage() {
         progressIndicator?.setProgress(0)
 
-        val streamFn = page.stream ?: return
+        val streamFn = page.displayStream() ?: return
 
         try {
             val buffer = withContext(Dispatchers.IO) { streamFn().use { Buffer().readFrom(it) } }

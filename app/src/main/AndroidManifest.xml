@@ -175,6 +175,11 @@
             android:exported="false" />
 
         <activity
+            android:name="mihon.translation.WebAiSignInActivity"
+            android:configChanges="uiMode|orientation|screenSize"
+            android:exported="false" />
+
+        <activity
             android:name=".extension.util.ExtensionInstallActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />

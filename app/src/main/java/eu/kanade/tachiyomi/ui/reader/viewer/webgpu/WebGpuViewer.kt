@@ -1200,7 +1200,7 @@ open class WebGpuViewer(
             return
         }
 
-        val stream = page.page.stream?.invoke() ?: run {
+        val stream = page.page.displayStream()?.invoke() ?: run {
             synchronized(lock) { if (pageInCache(page)) page.state = PageState.IDLE }
             return
         }
