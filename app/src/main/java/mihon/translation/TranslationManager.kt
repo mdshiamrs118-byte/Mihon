@@ -131,7 +131,7 @@ class TranslationManager(
             }
 
             var fallbackPages = 0
-            var boxes = 0
+            var boxCount = 0
             var pagesWithText = 0
             var alreadyDone = 0
             for (i in start until pages.size) {
@@ -211,7 +211,7 @@ class TranslationManager(
 
                     page.translation = TranslatedPage(target, marked.takeIf { usedFallback })
                     page.notifyTranslationChanged()
-                    boxes += bubbles.size
+                    boxCount += bubbles.size
                     pagesWithText++
                 } finally {
                     bitmap.recycle()
@@ -220,7 +220,7 @@ class TranslationManager(
             val message = when {
                 pagesWithText == 0 && alreadyDone > 0 -> "Everything from page ${start + 1} down is already translated."
                 pagesWithText == 0 -> "No ${language.name} text found from page ${start + 1} down. Check the text language."
-                else -> "Done: $boxes text boxes on $pagesWithText page(s)." +
+                else -> "Done: $boxCount text boxes on $pagesWithText page(s)." +
                     if (fallbackPages > 0) " $fallbackPages page(s) used DuckDuckGo AI Chat." else ""
             }
             finish(message)
