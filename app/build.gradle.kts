@@ -96,6 +96,10 @@ android {
         create("nightly") {
             initWith(release)
 
+            // R8 breaks ML Kit's reflective component setup
+            isMinifyEnabled = false
+            isShrinkResources = false
+
             applicationIdSuffix = ".debug"
 
             matchingFallbacks.addAll(commonMatchingFallbacks)

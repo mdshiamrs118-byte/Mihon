@@ -94,3 +94,10 @@
 
 # ONNX Runtime is called from native code
 -keep class ai.onnxruntime.** { *; }
+
+# ML Kit finds its components by class name
+-keep class com.google.mlkit.** { *; }
+-keep class com.google.android.gms.internal.mlkit_** { *; }
+-keep class * implements com.google.firebase.components.ComponentRegistrar { *; }
+-keep class com.google.firebase.components.** { *; }
+-dontwarn com.google.mlkit.**
