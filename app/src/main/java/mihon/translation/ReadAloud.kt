@@ -51,6 +51,9 @@ class ReadAloud(
     private var neuralJob: Job? = null
     private var track: AudioTrack? = null
 
+    /** Called on the main thread when a spoken box ends by itself. */
+    var onFinished: (() -> Unit)? = null
+
     private var framedView: ReaderPageImageView? = null
     private var utteranceCounter = 0L
     private var currentUtterance: String? = null
@@ -269,7 +272,10 @@ class ReadAloud(
 
     private fun finished(utteranceId: String) {
         mainHandler.post {
-            if (utteranceId == currentUtterance) clearFrame()
+            if (utteranceId == currentUtterance) {
+                clearFrame()
+                onFinished?.invoke()
+            }
         }
     }
 }

@@ -125,14 +125,12 @@ import mihon.translation.ReadAloudBoxes
 import mihon.translation.ReadAloudDisplay
 import mihon.translation.TranslationStore
 import mihon.translation.WebAiHost
-import mihon.translation.speechTagFor
 import tachiyomi.core.common.Constants
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.screens.LoadingScreen
 import tachiyomi.presentation.core.util.collectAsState
-import java.util.Locale
 import kotlin.math.hypot
 
 class ReaderActivity : BaseActivity() {
@@ -140,6 +138,16 @@ class ReaderActivity : BaseActivity() {
     private val graph: AppGraph by lazy { metroGraph() }
 
     private var tapCandidate = false
+
+    private val readAloudChain by lazy {
+        ReadAloudChain(
+            root = { findViewById(android.R.id.content) },
+            scope = lifecycleScope,
+            readAloud = graph.readAloud,
+            preferences = graph.translationPreferences,
+            viewer = { viewer },
+        )
+    }
     private var tapDownX = 0f
     private var tapDownY = 0f
     private var tapDownTime = 0L
@@ -427,6 +435,7 @@ class ReaderActivity : BaseActivity() {
         viewer?.destroy()
         if (!isChangingConfigurations) {
             WebAiHost.container = null
+            readAloudChain.stop()
             graph.readAloud.stop()
         }
         menuToggleToast?.cancel()
@@ -695,6 +704,7 @@ class ReaderActivity : BaseActivity() {
             viewModel.scanForReadAloud()
             toast(MR.strings.read_aloud_on)
         } else {
+            readAloudChain.stop()
             viewModel.translationManager.stopScan()
             toast(MR.strings.read_aloud_off)
         }
@@ -722,6 +732,7 @@ class ReaderActivity : BaseActivity() {
                     super.dispatchTouchEvent(ev)
                     return true
                 }
+                if (isTap) readAloudChain.stop()
             }
             MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_CANCEL -> tapCandidate = false
         }
@@ -748,8 +759,7 @@ class ReaderActivity : BaseActivity() {
             }
             .minByOrNull { (it.right - it.left) * (it.bottom - it.top) }
             ?: return false
-        val tag = if (box.translated) "en" else speechTagFor(box.text, ReadAloudDisplay.language)
-        graph.readAloud.speak(view, box, Locale.forLanguageTag(tag))
+        readAloudChain.speakTapped(view, page, box)
         return true
     }
 
