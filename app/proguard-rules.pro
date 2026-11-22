@@ -101,3 +101,5 @@
 -keep class * implements com.google.firebase.components.ComponentRegistrar { *; }
 -keep class com.google.firebase.components.** { *; }
 -dontwarn com.google.mlkit.**
+-keep class com.k2fsa.sherpa.onnx.** { *; }
+-dontwarn org.apache.commons.compress.**

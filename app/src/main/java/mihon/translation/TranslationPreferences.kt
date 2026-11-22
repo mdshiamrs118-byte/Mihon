@@ -40,6 +40,9 @@ class TranslationPreferences(
     /** A language tag, or empty to follow the text: English for translations, the text language otherwise. */
     val ttsLanguage: Preference<String> = preferenceStore.getString("pref_read_aloud_language", "")
 
+    /** Which speaker of a multi-speaker neural voice to use. */
+    val ttsSpeaker: Preference<Int> = preferenceStore.getInt("pref_read_aloud_speaker", -1)
+
     val ttsSpeechRate: Preference<Int> = preferenceStore.getInt("pref_read_aloud_rate", 100)
 
     fun online() = OnlineConfig(apiBaseUrl.get(), apiKey.get(), apiModel.get())

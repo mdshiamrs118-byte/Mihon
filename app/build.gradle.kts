@@ -138,6 +138,7 @@ android {
 
     packaging {
         jniLibs {
+            pickFirsts += "**/libonnxruntime.so"
             keepDebugSymbols += listOf(
                 "libandroidx.graphics.path",
                 "libarchive-jni",
@@ -226,7 +227,10 @@ dependencies {
     implementation("com.google.mlkit:text-recognition-japanese:16.0.1")
     implementation("com.google.mlkit:text-recognition-korean:16.0.1")
     implementation("com.google.mlkit:translate:17.0.3")
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.19.2")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.23.2")
+    implementation("org.apache.commons:commons-compress:1.27.1")
+    // Downloaded by the workflow: https://github.com/k2-fsa/sherpa-onnx/releases (same ONNX Runtime version as above)
+    implementation(fileTree("libs") { include("*.aar") })
     implementation(projects.data)
     implementation(projects.domain)
     implementation(projects.presentationCore)

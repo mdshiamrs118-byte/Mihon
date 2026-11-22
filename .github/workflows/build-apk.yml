@@ -26,6 +26,12 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
 
+      - name: Fetch sherpa-onnx (offline voices)
+        run: |
+          mkdir -p app/libs
+          curl -fL --retry 3 -o app/libs/sherpa-onnx.aar \
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.12.33/sherpa-onnx-1.12.33.aar
+
       - name: Build nightly APK
         run: ./gradlew assembleNightly
 

@@ -3,18 +3,29 @@ package mihon.translation
 import android.content.Context
 import android.content.Intent
 import android.graphics.RectF
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
 import android.os.Handler
 import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import com.k2fsa.sherpa.onnx.GeneratedAudio
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderPageImageView
 import eu.kanade.tachiyomi.util.system.toast
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /** Speaks translated text boxes through Android's TextToSpeech and frames the box being read. */
@@ -23,6 +34,7 @@ import java.util.Locale
 class ReadAloud(
     private val context: Context,
     private val preferences: TranslationPreferences,
+    val voices: NeuralVoices,
 ) {
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -34,6 +46,10 @@ class ReadAloud(
     private var ttsEngine: String? = null
     private var ready = false
     private var pending: (() -> Unit)? = null
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var neuralJob: Job? = null
+    private var track: AudioTrack? = null
 
     private var framedView: ReaderPageImageView? = null
     private var utteranceCounter = 0L
@@ -55,6 +71,12 @@ class ReadAloud(
         view.readAloudBox = RectF(box.left, box.top, box.right, box.bottom)
         val utterance = "box-${utteranceCounter++}"
         currentUtterance = utterance
+        val voice = neuralVoiceFor(locale)
+        if (voice != null) {
+            speakNeural(voice, box.text, locale, utterance)
+            return
+        }
+        stopNeural()
         withTts { engine ->
             val result = engine.setLanguage(locale)
             if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
@@ -69,6 +91,13 @@ class ReadAloud(
 
     fun test(text: String) {
         clearFrame()
+        val locale = chosenLocale() ?: Locale.ENGLISH
+        val voice = neuralVoiceFor(locale)
+        if (voice != null) {
+            speakNeural(voice, text, locale, "test")
+            return
+        }
+        stopNeural()
         withTts { engine ->
             engine.setLanguage(chosenLocale() ?: Locale.ENGLISH)
             engine.setSpeechRate(preferences.ttsSpeechRate.get() / 100f)
@@ -81,7 +110,79 @@ class ReadAloud(
 
     fun stop() {
         tts?.stop()
+        stopNeural()
         clearFrame()
+    }
+
+    /** The downloaded neural voice picked in the settings, if it can read [locale]. */
+    private fun neuralVoiceFor(locale: Locale): VoiceInfo? =
+        VoiceCatalog.selected(preferences.ttsEngine.get())
+            ?.takeIf { voices.isDownloaded(it) && locale.language in it.languages }
+
+    private fun speakNeural(voice: VoiceInfo, text: String, locale: Locale, utterance: String) {
+        tts?.stop()
+        stopNeural()
+        val speaker = preferences.ttsSpeaker.get().takeIf { it >= 0 } ?: voice.defaultSpeaker
+        val speed = preferences.ttsSpeechRate.get() / 100f
+        neuralJob = scope.launch {
+            val audio = try {
+                withContext(Dispatchers.Default) { voices.synthesize(voice, text, locale.language, speaker, speed) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                context.toast("The voice failed: ${e.message ?: e.javaClass.simpleName}")
+                finished(utterance)
+                return@launch
+            }
+            play(audio, utterance)
+        }
+    }
+
+    private fun play(audio: GeneratedAudio, utterance: String) {
+        val samples = audio.samples
+        if (samples.isEmpty()) {
+            finished(utterance)
+            return
+        }
+        val created = AudioTrack.Builder()
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build(),
+            )
+            .setAudioFormat(
+                AudioFormat.Builder()
+                    .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
+                    .setSampleRate(audio.sampleRate)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                    .build(),
+            )
+            .setBufferSizeInBytes(samples.size * Float.SIZE_BYTES)
+            .setTransferMode(AudioTrack.MODE_STATIC)
+            .build()
+        created.write(samples, 0, samples.size, AudioTrack.WRITE_BLOCKING)
+        created.setNotificationMarkerPosition(samples.size)
+        created.setPlaybackPositionUpdateListener(
+            object : AudioTrack.OnPlaybackPositionUpdateListener {
+                override fun onMarkerReached(t: AudioTrack) = finished(utterance)
+
+                override fun onPeriodicNotification(t: AudioTrack) = Unit
+            },
+            mainHandler,
+        )
+        track = created
+        created.play()
+    }
+
+    private fun stopNeural() {
+        neuralJob?.cancel()
+        neuralJob = null
+        track?.let {
+            runCatching { it.stop() }
+            it.release()
+        }
+        track = null
     }
 
     /** The installed text-to-speech engines by package name, with "" for the system default. */
@@ -103,6 +204,8 @@ class ReadAloud(
     }
 
     private fun release() {
+        stopNeural()
+        scope.launch(Dispatchers.Default) { voices.release() }
         clearFrame()
         tts?.shutdown()
         tts = null
@@ -112,7 +215,7 @@ class ReadAloud(
     }
 
     private fun withTts(action: (TextToSpeech) -> Unit) {
-        val wanted = preferences.ttsEngine.get()
+        val wanted = preferences.ttsEngine.get().takeUnless { it.startsWith(VoiceCatalog.PREFIX) }.orEmpty()
         if (tts != null && ttsEngine != wanted) release()
         val existing = tts
         if (existing != null && ready) {
