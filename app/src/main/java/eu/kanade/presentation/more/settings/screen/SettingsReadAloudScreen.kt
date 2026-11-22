@@ -3,6 +3,7 @@ package eu.kanade.presentation.more.settings.screen
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import eu.kanade.presentation.more.settings.Preference
@@ -11,6 +12,7 @@ import mihon.app.di.appGraph
 import mihon.translation.VoiceCatalog
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
+import tachiyomi.presentation.core.util.collectAsState
 
 @Serializable
 data object SettingsReadAloudScreen : SearchableSettings {
