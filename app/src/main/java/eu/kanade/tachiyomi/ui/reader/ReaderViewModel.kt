@@ -950,6 +950,10 @@ class ReaderViewModel(
         mutableState.update { it.copy(dialog = Dialog.ReadingModeSelect) }
     }
 
+    fun openTranslationDialog() {
+        mutableState.update { it.copy(dialog = Dialog.Translation) }
+    }
+
     fun openOrientationModeSelectDialog() {
         mutableState.update { it.copy(dialog = Dialog.OrientationModeSelect) }
     }
@@ -1142,6 +1146,7 @@ class ReaderViewModel(
         data object Settings : Dialog
         data object ReadingModeSelect : Dialog
         data object OrientationModeSelect : Dialog
+        data object Translation : Dialog
         data class PageActions(val page: ReaderPage) : Dialog
     }
 

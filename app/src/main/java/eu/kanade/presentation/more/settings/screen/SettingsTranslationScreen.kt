@@ -34,18 +34,22 @@ data object SettingsTranslationScreen : SearchableSettings {
     override fun getTitleRes() = MR.strings.pref_category_translation
 
     @Composable
-    override fun getPreferences(): List<Preference> {
+    override fun getPreferences(): List<Preference> = getTranslatorGroups() + getServiceGroups()
+
+    @Composable
+    fun getTranslatorGroups(): List<Preference> {
         val context = LocalContext.current
         val prefs = remember { context.appGraph.translationPreferences }
         val manager = remember { context.appGraph.translationManager }
+        return listOf(getGeneralGroup(prefs), getEngineGroup(manager, prefs))
+    }
 
-        return listOf(
-            getGeneralGroup(prefs),
-            getEngineGroup(manager, prefs),
-            getOnlineGroup(prefs),
-            getWebGroup(manager, prefs),
-            getFallbackGroup(prefs),
-        )
+    @Composable
+    fun getServiceGroups(): List<Preference> {
+        val context = LocalContext.current
+        val prefs = remember { context.appGraph.translationPreferences }
+        val manager = remember { context.appGraph.translationManager }
+        return listOf(getOnlineGroup(prefs), getWebGroup(manager, prefs), getFallbackGroup(prefs))
     }
 
     @Composable
@@ -82,7 +86,9 @@ data object SettingsTranslationScreen : SearchableSettings {
         val ready by produceState(false, info, language, states) { value = manager.isReady(info, language) }
         val busy = state?.progress != null
 
-        val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        val importLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.OpenMultipleDocuments(),
+        ) { uris ->
             if (uris.isNotEmpty()) scope.launch { context.toast(manager.importFiles(info, uris)) }
         }
 

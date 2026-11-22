@@ -81,6 +81,7 @@ import eu.kanade.presentation.reader.appbars.ReaderAppBars
 import eu.kanade.presentation.reader.appbars.ReaderTranslateActions
 import eu.kanade.presentation.reader.components.ChapterNavigatorType
 import eu.kanade.presentation.reader.settings.ReaderSettingsDialog
+import eu.kanade.presentation.reader.settings.ReaderTranslationDialog
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
@@ -331,6 +332,12 @@ class ReaderActivity : BaseActivity() {
                         },
                     )
                 }
+                is ReaderViewModel.Dialog.Translation -> {
+                    ReaderTranslationDialog(
+                        onDismissRequest = onDismissRequest,
+                        viewModel = viewModel,
+                    )
+                }
                 is ReaderViewModel.Dialog.PageActions -> {
                     ReaderPageActionsDialog(
                         onDismissRequest = onDismissRequest,
@@ -577,7 +584,6 @@ class ReaderActivity : BaseActivity() {
 
         val translationStatus by viewModel.translationManager.status.collectAsState()
         val readAloudActive by graph.readAloud.active.collectAsState()
-        val showingTranslated by viewModel.translationManager.showingTranslated.collectAsState()
 
         val verticalNavigatorModes by readerPreferences.verticalNavigator.collectAsState()
         val verticalNavigator = verticalNavigatorModes.contains(readingMode)
@@ -637,12 +643,7 @@ class ReaderActivity : BaseActivity() {
             onClickReadAloud = ::toggleReadAloud,
             translate = ReaderTranslateActions(
                 status = translationStatus,
-                showingTranslated = showingTranslated,
-                onTranslate = viewModel::translateFromCurrentPage,
-                onStop = viewModel.translationManager::stop,
-                onToggleShown = viewModel::toggleTranslated,
-                onDelete = viewModel::deleteTranslation,
-                onOpenSettings = ::openTranslationSettings,
+                onClick = viewModel::openTranslationDialog,
             ),
             cropEnabled = cropEnabled,
             onClickCropBorder = {
@@ -766,15 +767,6 @@ class ReaderActivity : BaseActivity() {
             }
         }
         return null
-    }
-
-    private fun openTranslationSettings() {
-        startActivity(
-            Intent(this, MainActivity::class.java).apply {
-                action = Intent.ACTION_APPLICATION_PREFERENCES
-                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            },
-        )
     }
 
     private fun openMangaScreen() {

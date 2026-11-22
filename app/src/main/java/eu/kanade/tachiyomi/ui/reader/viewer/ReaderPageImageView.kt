@@ -77,6 +77,8 @@ open class ReaderPageImageView @JvmOverloads constructor(
             invalidate()
         }
 
+    private val outlineRadius = resources.displayMetrics.density * 6f
+
     private val scannedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         color = 0xFF2979FF.toInt()
@@ -304,11 +306,13 @@ open class ReaderPageImageView @JvmOverloads constructor(
             val rect = RectF()
             ReadAloudBoxes.of(page).forEach {
                 rect.set(it.left, it.top, it.right, it.bottom)
-                boxToViewRect(rect)?.let { mapped -> canvas.drawRect(mapped, scannedPaint) }
+                boxToViewRect(rect)?.let { mapped ->
+                    canvas.drawRoundRect(mapped, outlineRadius, outlineRadius, scannedPaint)
+                }
             }
         }
         val reading = readAloudBox?.let(::boxToViewRect) ?: return
-        canvas.drawRect(reading, readAloudPaint)
+        canvas.drawRoundRect(reading, outlineRadius, outlineRadius, readAloudPaint)
     }
 
     /**

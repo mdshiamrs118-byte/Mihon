@@ -4,18 +4,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -35,74 +28,18 @@ import tachiyomi.presentation.core.i18n.stringResource
 
 class ReaderTranslateActions(
     val status: TranslationStatus,
-    val showingTranslated: Boolean,
-    val onTranslate: () -> Unit,
-    val onStop: () -> Unit,
-    val onToggleShown: () -> Unit,
-    val onDelete: () -> Unit,
-    val onOpenSettings: () -> Unit,
+    val onClick: () -> Unit,
 )
 
 @Composable
 private fun TranslateButton(actions: ReaderTranslateActions) {
-    var expanded by remember { mutableStateOf(false) }
-    IconButton(onClick = { expanded = true }) {
+    IconButton(onClick = actions.onClick) {
         if (actions.status.running) {
             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
         } else {
             Icon(
                 imageVector = MaterialSymbols.Rounded.Translate,
                 contentDescription = stringResource(MR.strings.action_translate),
-            )
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            if (actions.status.running) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(MR.strings.translation_stop)) },
-                    onClick = {
-                        expanded = false
-                        actions.onStop()
-                    },
-                )
-            } else {
-                DropdownMenuItem(
-                    text = { Text(stringResource(MR.strings.translation_from_page)) },
-                    onClick = {
-                        expanded = false
-                        actions.onTranslate()
-                    },
-                )
-            }
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        stringResource(
-                            if (actions.showingTranslated) {
-                                MR.strings.translation_show_original
-                            } else {
-                                MR.strings.translation_show_translated
-                            },
-                        ),
-                    )
-                },
-                onClick = {
-                    expanded = false
-                    actions.onToggleShown()
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(MR.strings.translation_delete)) },
-                onClick = {
-                    expanded = false
-                    actions.onDelete()
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(MR.strings.translation_settings)) },
-                onClick = {
-                    expanded = false
-                    actions.onOpenSettings()
-                },
             )
         }
     }

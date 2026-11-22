@@ -1103,7 +1103,9 @@
     <string name="translation_show_original">Show original</string>
     <string name="translation_show_translated">Show translation</string>
     <string name="translation_delete">Delete translation of this chapter</string>
-    <string name="translation_settings">Translation settings</string>
+    <string name="translation_this_chapter">This chapter</string>
+    <string name="translation_from_page_summary">Translates this page and everything below it</string>
+    <string name="pref_translation_services">Services</string>
     <string name="translation_sign_in_title">Sign in: %1$s</string>
     <string name="translation_signed_in_done">I\'m signed in</string>
     <string name="translation_sign_in_hint">Sign in or pass any check, send one test message to see it answers, then tap the button.</string>
